@@ -7,5 +7,11 @@ Very naive and simple statistical language detector in Elixir using [Euclidean D
 - No support for special characters or n-grams
 - Memory intensive for very large datasets despite chunking
 
+## Usage
+
+```bash
+elixir language_detector.exs
+```
+
 ## Sample Data
 You can get sample data from: https://tatoeba.org
