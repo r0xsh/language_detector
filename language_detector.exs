@@ -1,3 +1,5 @@
+Mix.install([{:unidecode, "~> 1.0"}])
+
 defmodule LanguageDetector do
   @moduledoc """
   An optimized statistical language detector that uses letter frequencies.
@@ -5,23 +7,23 @@ defmodule LanguageDetector do
   """
 
   @profile_dir "profiles"
-  # 1MB chunks
-  @chunk_size 1024 * 1024
+  # 2MB chunks
+  @chunk_size 1024 * 1024 * 2
   # Number of top words to track
-  @top_words_count 100
+  @top_words_count 300
   # Number of top n-grams to track
-  @top_ngrams_count 150
+  @top_ngrams_count 400
 
   # Weights for different features
   @weights %{
     # Common words
-    words: 0.3,
+    words: 0.35,
     # Single letters
-    letters: 0.1,
+    letters: 0.15,
     # 2-letter sequences
-    bigrams: 0.2,
+    bigrams: 0.25,
     # 3-letter sequences
-    trigrams: 0.3
+    trigrams: 0.25
   }
 
   defmodule Profile do
@@ -32,23 +34,27 @@ defmodule LanguageDetector do
               trigrams: %{}
   end
 
-  @doc """
-  Train the detector using text files from the data directory.
-  Processes files in chunks to handle large datasets efficiently.
-  """
   def train_all(data_dir \\ "data") do
     File.mkdir_p!(@profile_dir)
 
-    data_dir
-    |> File.ls!()
-    |> Stream.filter(&String.ends_with?(&1, ".txt"))
-    |> Task.async_stream(&process_language_file(&1, data_dir),
-      timeout: :infinity,
-      ordered: false
-    )
-    |> Enum.reduce(%{}, fn {:ok, {lang, profile}}, acc ->
-      Map.put(acc, lang, profile)
-    end)
+    if is_binary(data_dir) do
+      # Get all .txt files from the directory
+      data_dir
+      |> File.ls!()
+      |> Stream.filter(&String.ends_with?(&1, ".txt"))
+      |> Task.async_stream(
+        fn file ->
+          language = Path.rootname(file)
+          file_path = Path.join(data_dir, file)
+          process_training_file(language, file_path)
+        end,
+        timeout: :infinity,
+        ordered: false
+      )
+      |> Enum.reduce(%{}, fn {:ok, {lang, profile}}, acc ->
+        Map.put(acc, lang, profile)
+      end)
+    end
   end
 
   def guess(text, loaded_profiles) do
@@ -83,7 +89,7 @@ defmodule LanguageDetector do
   Process a chunk of text and count frequencies of all features.
   """
   def process_chunk(chunks) when is_list(chunks) do
-    text = Enum.join(chunks) |> String.downcase()
+    text = Enum.join(chunks) |> String.downcase() |> Unidecode.decode()
 
     # Get letter frequencies
     letter_freqs =
@@ -122,13 +128,7 @@ defmodule LanguageDetector do
     Map.merge(map1, map2, fn _k, v1, v2 -> v1 + v2 end)
   end
 
-  @doc """
-  Process a single language file to extract all features.
-  """
-  def process_language_file(file, data_dir) do
-    language = Path.rootname(file)
-    file_path = Path.join(data_dir, file)
-
+  defp process_training_file(language, file_path) do
     {letter_freqs, word_freqs, bigram_freqs, trigram_freqs} =
       file_path
       |> File.stream!([], @chunk_size)
@@ -319,29 +319,59 @@ defmodule LanguageDetector do
 end
 
 # Train and save profiles
-profiles = LanguageDetector.train_all()
+_profiles = LanguageDetector.train_all("data")
 
 # Later, load saved profiles
 loaded_profiles = LanguageDetector.load_profiles()
 
-# a list of sentences in french, spanish, english and basque
 texts = [
-  "Bonjour tout le monde !",
-  "Hola mundo !",
-  "Hello world !",
-  "Konnichiwa sekai !",
-  "Hola mundo!",
-  "Konnichiwa sekai!",
-  "Je suis à la maison",
-  "Il y a du monde dehors",
-  "This is an example sentence.",
-  "This is another example sentence.",
-  "This is yet another example sentence.",
-  "Lo egin nahi dut.",
-  "Zure zentzugabekeria ez da nire errua.",
-  "Lagundu al dizut?",
-  "Bost urte ditut.",
-  "Dušana dut izena."
+  # English - Mix of common structures, idioms, and varying complexity
+  "The weather is lovely today.",
+  "I can't believe how fast time flies!",
+  "Would you mind helping me with this?",
+  "She's been working here for five years.",
+  "The quick brown fox jumps over the lazy dog.",
+  "Could you please pass me the salt?",
+  "That movie was absolutely fantastic!",
+  "I'll think about it and get back to you.",
+  "We should probably get going soon.",
+  "Have you ever been to Paris in springtime?",
+
+  # French - Including contractions, accents, and common expressions
+  "Je ne sais pas quoi faire aujourd'hui.",
+  "Pourriez-vous m'indiquer le chemin ?",
+  "C'est vraiment une belle journée !",
+  "J'aimerais un café, s'il vous plaît.",
+  "Nous sommes allés au cinéma hier soir.",
+  "Il fait beau temps ce matin.",
+  "Je dois partir travailler maintenant.",
+  "Enchantée de faire votre connaissance.",
+  "Comment allez-vous aujourd'hui ?",
+  "Je voudrais réserver une table pour deux.",
+
+  # Spanish - Including subjunctive, pronouns, and typical expressions
+  "¿Qué tal has estado últimamente?",
+  "Me gustaría un café con leche, por favor.",
+  "No sé si podré ir a la fiesta mañana.",
+  "¡Qué bonito día hace hoy!",
+  "¿Has visto mis llaves por alguna parte?",
+  "Necesito que me ayudes con esto.",
+  "¿Podrías hablar más despacio?",
+  "Vamos a la playa este fin de semana.",
+  "¡Cuánto tiempo sin verte!",
+  "Me encantaría conocer tu ciudad.",
+
+  # Basque - Including specific grammatical structures and vocabulary
+  "Gaur goizean mendira joan naiz.",
+  "Euskara ikasten ari naiz.",
+  "Etxera noa orain.",
+  "Bihar goizean elkar ikusiko dugu.",
+  "Zer moduz zaude?",
+  "Kafea nahi duzu?",
+  "Ez dakit zer egin.",
+  "Nire izena Mikel da.",
+  "Atzo zinera joan ginen.",
+  "Euskal Herrian bizi naiz."
 ]
 
 Enum.each(texts, fn text ->
