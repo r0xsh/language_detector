@@ -1,16 +1,11 @@
 # Statistical Language Detector
 
-Very naive and simple statistical language detector in Elixir using [Euclidean Distance](https://en.wikipedia.org/wiki/Euclidean_distance) and letter frequencies.
+Very naive and simple statistical language detector in Elixir using [[Euclidean Distance](https://en.wikipedia.org/wiki/Euclidean_distance)](https://en.wikipedia.org/wiki/Cosine_similarity), letters frequencies, words frequencies and [n-gram](https://en.wikipedia.org/wiki/N-gram).
 
 ## TODO
 
-- Try another approach using k-nearest neighbors algorithm
-- Compile language profiles into `[language].profile` files
-
-## Limitations
-- Basic statistical approach using only letter frequencies
-- No support for special characters or n-grams
-- Memory intensive for very large datasets despite chunking
+- ~[ ] Try another approach using k-nearest neighbors algorithm~
+- [x] Compile language profiles into `[language].profile` files
 
 ## Usage
 
